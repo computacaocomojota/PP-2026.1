@@ -5,7 +5,6 @@
 #include <math.h>
 #include <omp.h>
 #include <string.h>
-#include <ctype.h>
 
 /* -------------------------------------------------------------------------- */
 /* Utilitários para arrays 2D armazenados em vetor 1D                        */
@@ -25,7 +24,6 @@ static void free_image(double *m) {
 }
 
 /* Lê uma imagem PGM e retorna o vetor de pixels */
-
 double *read_pgm(const char *filename, int *rows, int *cols) {
     FILE *file = fopen(filename, "rb");
     if (!file) {
@@ -43,17 +41,10 @@ double *read_pgm(const char *filename, int *rows, int *cols) {
     }
 
     int c;
-    while (1) {
-        c = fgetc(file);
-        if (isspace(c)) {
-            continue;
-        } else if (c == '#') {
-            while ((c = fgetc(file)) != '\n' && c != EOF);
-        } else {
-            ungetc(c, file);
-            break;
-        }
+    while ((c = fgetc(file)) == '#') {
+        while ((c = fgetc(file)) != '\n' && c != EOF);
     }
+    ungetc(c, file);
 
     if (fscanf(file, "%d %d %d", cols, rows, &max_val) != 3) {
         printf("Erro: Arquivo PGM invalido (dimensoes)\n");
@@ -61,7 +52,7 @@ double *read_pgm(const char *filename, int *rows, int *cols) {
         exit(1);
     }
 
-    fgetc(file); // Pula o último espaço/newline antes dos dados binários
+    fgetc(file);
 
     double *image = alloc_image(*rows, *cols);
     unsigned char pixel;
@@ -107,6 +98,8 @@ void write_pgm(const char *filename, double *image, int rows, int cols) {
     fclose(file);
     printf("Imagem salva: %s\n", filename);
 }
+
+/* -------------------------------------------------------------------------- */
 
 void create_gaussian_kernel(int size, double sigma, double *kernel) {
     if (size % 2 == 0) {
@@ -197,63 +190,6 @@ void iterative_gaussian_blur(double *image, int rows, int cols, int k_size, int 
 }
 
 int main(int argc, char *argv[]) {
-    
-    if (argc == 1) {
-        
-        int rows = 5;
-        int cols = 5;
-        double initial_data[] = {
-            1, 2, 3, 2, 1,
-            2, 4, 6, 4, 2,
-            3, 6, 9, 6, 3,
-            2, 4, 6, 4, 2,
-            1, 2, 3, 2, 1
-        };
-
-        double *image = alloc_image(rows, cols);
-        for (int i = 0; i < rows * cols; i++) {
-            image[i] = initial_data[i];
-        }
-
-        printf("Imagem original:\n[");
-        for (int i = 0; i < rows; i++) {
-            if (i > 0) printf(" ");
-            printf("[");
-            for (int j = 0; j < cols; j++) {
-                printf("%g", image[i * cols + j]);
-                if (j < cols - 1) printf(". ");
-                else if (i == rows - 1) printf("]");
-                else printf("]\n");
-            }
-        }
-        printf("]\n");
-
-        int k_size = 3;
-        int iterations = 2;
-        double sigma = 1.0;
-        double *output = alloc_image(rows, cols);
-
-        iterative_gaussian_blur(image, rows, cols, k_size, iterations, sigma, output);
-
-        printf("\nImagem após filtro (arredondada):\n[");
-        for (int i = 0; i < rows; i++) {
-            if (i > 0) printf(" ");
-            printf("[");
-            for (int j = 0; j < cols; j++) {
-                printf("%.2f", output[i * cols + j]);
-                if (j < cols - 1) printf(" ");
-                else if (i == rows - 1) printf("]");
-                else printf("]\n");
-            }
-        }
-        printf("]\n");
-
-        free_image(image);
-        free_image(output);
-
-        return 0;
-    }
-
     if (argc < 4) {
         printf("Uso: %s <caminho_imagem> <tamanho_label> <kernel_size>\n", argv[0]);
         return 1;
@@ -267,12 +203,8 @@ int main(int argc, char *argv[]) {
     double sigma = 1.0;
     int rows, cols;
 
-    // Carregamento
-
     double *image = read_pgm(input_file, &rows, &cols);
     double *output = alloc_image(rows, cols);
-
-    // Medição de tempo (usando omp_get_wtime para precisão total)
 
     double start = omp_get_wtime();
     iterative_gaussian_blur(image, rows, cols, k_size, iterations, sigma, output);
@@ -280,14 +212,12 @@ int main(int argc, char *argv[]) {
 
     // SAÍDA FORMATADA: Arquivo,Kernel,Threads,Tempo_s
     // Usamos '0' em threads para identificar o Serial no CSV
-
     printf("%s, %d, 0, %.4f\n", img_label, k_size, end - start);
 
-    // Salva a imagem de saída em PGM
-
-    char out_filename[256];
-    snprintf(out_filename, sizeof(out_filename), "%s_k%d_out.pgm", img_label, k_size);
-    write_pgm(out_filename, output, rows, cols);
+    //Salva a imagem de saída em PGM
+    //char out_filename[256];
+    //snprintf(out_filename, sizeof(out_filename), "%s_k%d_out.pgm", img_label, k_size);
+    //write_pgm(out_filename, output, rows, cols);
 
     // Limpeza
     free_image(image);
